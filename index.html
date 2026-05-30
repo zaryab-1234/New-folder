@@ -1196,6 +1196,20 @@ function toggleDrop(key){
 }
 function closeAllDrops(){document.querySelectorAll(".csel-drop").forEach(function(d){d.classList.remove("open");});document.querySelectorAll(".csel-btn").forEach(function(b){b.classList.remove("open");});}
 document.addEventListener("click",function(e){if(!e.target.closest(".csel-wrap"))closeAllDrops();});
+
+// ── Diary card button delegation ──
+document.addEventListener("click",function(e){
+  var delBtn=e.target.closest(".diary-del-btn");
+  var editBtn=e.target.closest(".diary-edit-btn");
+  if(delBtn){
+    var did=delBtn.getAttribute("data-did");
+    askConfirm("Delete this diary entry?",function(){delDiary(did);});
+  }
+  if(editBtn){
+    var did2=editBtn.getAttribute("data-did");
+    openDiaryModal(did2);
+  }
+});
 function buildClassDrops(){
   var dynCls=getClasses();
   var all=["All"].concat(dynCls);
@@ -1814,7 +1828,7 @@ function diaryCardHTML(d,showAct){
 }
 function openDiaryModal(id){
   editDiaryId=id;document.getElementById("diary-modal-title").textContent=id?"Edit Diary Entry":"Upload Diary Entry";buildClassDrops();
-  if(id){var d=diary.find(function(x){return x.id===id;});document.getElementById("d-date").value=d.date;document.getElementById("d-subj").value=d.subject;document.getElementById("d-hw").value=d.homework;document.getElementById("d-notes").value=d.notes||"";dropVal["d-cls"]=d.cls;buildDrop("d-cls",classes,null);}
+  if(id){var d=diary.find(function(x){return String(x.id)===String(id);});document.getElementById("d-date").value=d.date;document.getElementById("d-subj").value=d.subject;document.getElementById("d-hw").value=d.homework;document.getElementById("d-notes").value=d.notes||"";dropVal["d-cls"]=d.cls;buildDrop("d-cls",classes,null);}
   else{document.getElementById("d-date").value=todayStr();document.getElementById("d-subj").value="";document.getElementById("d-hw").value="";document.getElementById("d-notes").value="";dropVal["d-cls"]=CU.cls||classes[0];buildDrop("d-cls",classes,null);}
   openModal("modal-diary");
 }
@@ -1827,9 +1841,9 @@ function saveDiary(){
   closeModal("modal-diary");setupDiaryPage();if(curPage==="dashboard")renderDashboard();
 }
 function delDiary(id){
-  var d=diary.find(function(x){return x.id===id;});
+  var d=diary.find(function(x){return String(x.id)===String(id);});
   if(d) recycleBin.push({id:uid(),type:"diary",label:d.subject+" ("+d.cls+")",icon:"&#128211;",meta:"Date: "+d.date+" | By: "+d.teacherName,deletedAt:new Date().toLocaleDateString("en-PK"),data:Object.assign({},d),relatedResults:[],relatedDiary:[]});
-  diary=diary.filter(function(x){return x.id!==id;});
+  diary=diary.filter(function(x){return String(x.id)!==String(id);});
   setupDiaryPage();if(curPage==="dashboard")renderDashboard();
   showToast("Diary entry moved to Recycle Bin.");
 }
