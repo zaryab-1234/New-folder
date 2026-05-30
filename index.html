@@ -980,13 +980,13 @@ table     { min-width: 100%; border-collapse: collapse; }
 <!-- IMPORT STUDENTS MODAL -->
 <div class="modal-overlay" id="modal-import-students">
   <div class="modal-box wide">
-    <div class="modal-title">&#127891; Import Students from Excel</div>
+    <div class="modal-title">&#127891; Import Students</div>
     <div id="si-s1">
       <div class="drop-zone" onclick="document.getElementById('si-inp').click()">
         <div style="font-size:40px;margin-bottom:10px">&#127891;</div>
-        <div style="color:var(--pri);font-weight:800;font-size:15px;margin-bottom:4px">Click to choose Excel or PDF file</div>
-        <div style="color:var(--txt3);font-size:12px;font-weight:600">Student list .xlsx, .xls, or .pdf</div>
-        <input type="file" id="si-inp" accept=".xlsx,.xls,.pdf" style="display:none" onchange="handleStudentImport(event)"/>
+        <div style="color:var(--pri);font-weight:800;font-size:15px;margin-bottom:4px">Click to choose file</div>
+        <div style="color:var(--txt3);font-size:12px;font-weight:600">Excel (.xlsx/.xls), CSV, Word (.docx), or PDF</div>
+        <input type="file" id="si-inp" accept=".xlsx,.xls,.csv,.docx,.pdf" style="display:none" onchange="handleStudentImport(event)"/>
       </div>
       <div class="imp-info">
         <div style="color:var(--pri);font-weight:800;margin-bottom:8px">Expected columns (Excel) or layout (PDF):</div>
@@ -994,8 +994,22 @@ table     { min-width: 100%; border-collapse: collapse; }
           <tr style="background:var(--soft)"><th style="padding:6px 10px;border:2px solid var(--border);color:var(--pri);text-align:left;font-weight:700">Name</th><th style="padding:6px 10px;border:2px solid var(--border);color:var(--pri);text-align:left;font-weight:700">Roll No</th><th style="padding:6px 10px;border:2px solid var(--border);color:var(--pri);text-align:left;font-weight:700">Phone Number</th><th style="padding:6px 10px;border:2px solid var(--border);color:var(--pri);text-align:left;font-weight:700">Class</th></tr>
           <tr><td style="padding:5px 10px;border:2px solid var(--border);color:var(--txt2)">Ahmed Raza</td><td style="padding:5px 10px;border:2px solid var(--border);color:var(--txt2)">801</td><td style="padding:5px 10px;border:2px solid var(--border);color:var(--txt2)">03001234567</td><td style="padding:5px 10px;border:2px solid var(--border);color:var(--txt2)">Class 8</td></tr>
         </table></div>
-        <div style="margin-top:8px"><strong>PDF:</strong> Oxbridge student contact list — class names are auto-detected per page. <strong>Excel:</strong> use header row with Name, Roll, Phone, Class.</div>
+        <div style="margin-top:8px"><strong>PDF:</strong> Oxbridge student contact list — class names are auto-detected per page. <strong>Excel/CSV:</strong> use header row with Name, Roll, Phone, Class. <strong>Word (.docx):</strong> same table or list format as Excel.</div>
         <div style="margin-top:6px">Students login with their <strong>Roll Number + Phone Number</strong> after import.</div>
+      </div>
+    </div>
+    <!-- Step 3: Class override (shown when XLS/CSV has single detected class) -->
+    <div id="si-s3" style="display:none;padding:10px 0">
+      <div style="font-size:36px;text-align:center;margin-bottom:10px">&#127979;</div>
+      <div style="font-weight:800;font-size:15px;color:var(--pri);margin-bottom:6px;text-align:center">Assign Class to Students</div>
+      <div style="font-size:13px;color:var(--txt2);margin-bottom:14px;text-align:center" id="si-cls-msg"></div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:var(--txt2);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Select Class for All Imported Students</label>
+        <select id="si-cls-sel" style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:14px;font-weight:700;color:var(--txt1);background:var(--card);cursor:pointer"></select>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="cancelXlsImport()">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmXlsImport()">&#10003; Confirm Import</button>
       </div>
     </div>
     <div id="si-s2" style="display:none;text-align:center;padding:20px 0">
@@ -1063,6 +1077,7 @@ table     { min-width: 100%; border-collapse: collapse; }
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script>
 function confirmDelResult(btn){
   var rid=btn.getAttribute("data-rid");
@@ -1072,7 +1087,7 @@ function confirmDelResult(btn){
 // DATA
 var classes = ["Class 8", "Class 9", "Class 10"];
 var users = [
-  {id:1,name:"Principal",role:"principal",username:"principal",password:"1234"},
+  {id:1,name:"Dr. Ayesha Khan",role:"principal",username:"principal",password:"1234"},
   {id:2,name:"Mr. Bilal Ahmad",role:"teacher",username:"bilal",password:"1234",cls:"Class 8"},
   {id:3,name:"Ms. Sana Mirza",role:"teacher",username:"sana",password:"1234",cls:"Class 9"},
   {id:4,name:"Ahmed Raza",role:"student",username:"ahmed",password:"1234",cls:"Class 8",rollNo:"801",fatherName:"",phone:"03001234567"},
@@ -1130,6 +1145,7 @@ var binFilter='all';
 var staffSelectedTestId=null,studentSelectedTestId=null,staffViewMode='test';
 var staffSelectedBaseClass=null,staffSelectedSection=null;
 var editDiaryId=null,editResultId=null,editCalId=null,editUserId=null;
+var xlsStagingRows=[],xlsStagingUpdated=0;
 var TYPE_COLOR={exam:"#ef4444",holiday:"#10b981",meeting:"#f59e0b",event:"#6366f1"};
 var EVENT_TYPES=["event","exam","holiday","meeting"];
 var dropVal={"dp-cls":"All","dt-cls":"All","res-cls":"All","d-cls":"Class 8","r-cls":"Class 8","u-cls":"Class 8","c-type":"event","test-cls":"Class 8"};
@@ -3116,13 +3132,17 @@ function doImport(){
 function openStudentImportModal(){
   document.getElementById("si-s1").style.display="";
   document.getElementById("si-s2").style.display="none";
+  document.getElementById("si-s3").style.display="none";
   document.getElementById("si-inp").value="";
+  xlsStagingRows=[];xlsStagingUpdated=0;
   openModal("modal-import-students");
 }
 function handleStudentImport(e){
   var file=e.target.files[0];if(!file)return;
   var name=(file.name||"").toLowerCase();
   if(name.endsWith(".pdf")){return handlePdfStudentImport(file);}
+  if(name.endsWith(".docx")){return handleDocxStudentImport(file);}
+  // xlsx, xls, csv — all handled by SheetJS
   var reader=new FileReader();
   reader.onload=function(ev){
     try{
@@ -3130,84 +3150,249 @@ function handleStudentImport(e){
       var wb=XLSX.read(data,{type:"array"});
       var ws=wb.Sheets[wb.SheetNames[0]];
       var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+      xlsStagingRows=[];xlsStagingUpdated=0;
       var added=0,updated=0,skipped=0,curCls="",curSec="";
-      // Try to detect a header row with "phone"/"contact"/"mobile" so we know which column has phones
-      var phoneCol=-1, nameCol=-1, rollCol=-1, headerFound=false;
-      for(var h=0;h<rows.length&&h<20;h++){
+
+      // ── Detect format: Sharplite (Sr|Reg#|_|Roll|Name|C1|C2|C3|C4) or generic header ──
+      var isSharplite=false;
+      var nameCol=-1,rollCol=-1,phoneColsGeneric=[];
+      for(var h=0;h<rows.length&&h<15;h++){
         var hr=rows[h];
+        var rowStr=hr.map(function(c){return String(c||"").toLowerCase().trim();}).join("|");
+        if(rowStr.indexOf("name of student")>=0&&rowStr.indexOf("roll no")>=0){
+          isSharplite=true; break;
+        }
+        // Generic header detection
         for(var c=0;c<hr.length;c++){
           var cell=String(hr[c]||"").toLowerCase().trim();
-          if(!cell)continue;
-          if(/phone|contact|mobile|cell|number|cnic|whatsapp/.test(cell)&&!/roll/.test(cell)){phoneCol=c;headerFound=true;}
-          if(cell==="name"||cell==="student name"||cell==="full name"||cell==="student"){nameCol=c;headerFound=true;}
-          if(/^roll/.test(cell)||cell==="r.no"||cell==="rno"){rollCol=c;headerFound=true;}
+          if((cell==="name"||cell==="student name"||cell==="full name")&&nameCol<0)nameCol=c;
+          if((/^roll/.test(cell)||cell==="r.no"||cell==="rno")&&rollCol<0)rollCol=c;
+          if(/^contact\s*\d*$|^phone|mobile|whatsapp/.test(cell)&&!/roll/.test(cell))phoneColsGeneric.push(c);
         }
-        if(headerFound)break;
+        if(nameCol>=0&&rollCol>=0)break;
       }
+
       for(var i=0;i<rows.length;i++){
         var row=rows[i];
         var c0=String(row[0]||"").trim();
-        var c2=String(row[2]||"").replace(/\s+/g," ").trim();
-        var c3=String(row[3]||"").trim();
-        // Class/section headers (Oxbridge-style sheets)
-        if(c0.toLowerCase()==="class")curCls="Class "+String(row[2]||"").trim();
-        if(c0.toLowerCase()==="section:")curSec=String(row[2]||"").trim();
+
+        // ── Class heading detection ──
+        // Sharplite: "Class Name:" can appear in any column; class value is in next non-empty col
+        var rowJoined=row.map(function(c){return String(c||"").trim();}).join("|");
+        // Re-detect Sharplite header mid-file (multi-class XLS has repeated header rows)
+        if(!isSharplite&&/name of student/i.test(rowJoined)&&/roll no/i.test(rowJoined)){isSharplite=true;continue;}
+        if(isSharplite&&/name of student/i.test(rowJoined)&&/roll no/i.test(rowJoined)){continue;}// skip repeated header rows
+        if(/class\s*name\s*:/i.test(rowJoined)){
+          // Find class value: scan cols after "Class Name:" col for a non-empty word value
+          var foundClsLabel=false;
+          var newCls="", newSec="";
+          for(var ci2=0;ci2<row.length;ci2++){
+            var cv=String(row[ci2]||"").trim();
+            if(!foundClsLabel){
+              if(/class\s*name\s*:/i.test(cv)) foundClsLabel=true;
+            } else {
+              if(cv&&!/^section\s*:/i.test(cv)&&!newCls){newCls=cv;}
+            }
+            // Section can be on same row: "Section:" label followed by value
+            if(/^section\s*:/i.test(cv)&&ci2+1<row.length){
+              var sv=String(row[ci2+1]||"").trim();
+              if(sv) newSec=sv;
+            }
+          }
+          if(newCls){curCls=classFromWord(newCls);curSec=newSec;}
+          continue;
+        }
+        // Legacy: col0="Class", class in col2
+        if(c0.toLowerCase()==="class"){curCls="Class "+String(row[2]||"").trim();continue;}
+        if(/^section\s*:/i.test(c0)){curSec=String(row[2]||"").trim();continue;}
 
         var rollNo="", stuName="", dadName="", phone="";
 
-        if(headerFound&&nameCol>=0&&rollCol>=0){
-          // Header-based mode
+        if(isSharplite){
+          // Sharplite columns: 0=Sr, 1=Reg#, 2=blank, 3=Roll No, 4=Name, 5-8=Contact 1-4
+          var sr=parseFloat(c0);
+          if(isNaN(sr)||sr<=0)continue;
+          rollNo=String(row[3]||"").replace(/\.0$/,"").trim()||String(row[1]||"").replace(/\.0$/,"").trim();
+          stuName=String(row[4]||"").replace(/\s+/g," ").trim();
+          if(!rollNo||!stuName)continue;
+          // Skip header row if name looks like a column label
+          if(/name of student/i.test(stuName))continue;
+          // Pick first valid phone from contacts 5-8
+          for(var k=5;k<=8;k++){
+            var v=String(row[k]||"").replace(/\.0$/,"").replace(/[\s\-\(\)]/g,"").trim();
+            // Restore leading zero: Excel stores 03XXXXXXXXX as 3XXXXXXXXX (10 digits)
+            if(/^\d{10}$/.test(v)&&v[0]!=="0")v="0"+v;
+            if(/^\+?\d{9,15}$/.test(v)){phone=v;break;}
+          }
+        } else if(nameCol>=0&&rollCol>=0){
+          // Generic header-based mode
           var rawRoll=String(row[rollCol]||"").replace(/\s+/g," ").trim().replace(/\.0$/,"");
           var rawName=String(row[nameCol]||"").trim();
           if(!rawRoll||!rawName)continue;
-          // Skip if this row looks like the header itself
           if(rawName.toLowerCase()==="name"||rawName.toLowerCase()==="student name")continue;
           if(isNaN(parseFloat(rawRoll))&&rawRoll.length<2)continue;
           rollNo=rawRoll;
           var m=rawName.match(/^(.+?)\s+[SsDd]\/[Oo]\s+(.+)$/);
           if(m){stuName=m[1].trim();dadName=m[2].trim();}else{stuName=rawName;}
-          if(phoneCol>=0){
-            phone=String(row[phoneCol]||"").replace(/\.0$/,"").trim();
+          for(var ki=0;ki<phoneColsGeneric.length;ki++){
+            var pv=String(row[phoneColsGeneric[ki]]||"").replace(/\.0$/,"").replace(/[\s\-\(\)]/g,"").trim();
+            if(/^\d{10}$/.test(pv)&&pv[0]!=="0")pv="0"+pv;
+            if(/^\+?\d{9,15}$/.test(pv)){phone=pv;break;}
           }
         } else {
           // Legacy Oxbridge format (sr#, _, roll, name, ...)
-          var sn=parseFloat(c0);
-          if(isNaN(sn)||sn<=0||!c2||!c3)continue;
+          var c2=String(row[2]||"").replace(/\s+/g," ").trim();
+          var c3=String(row[3]||"").trim();
+          var sn2=parseFloat(c0);
+          if(isNaN(sn2)||sn2<=0||!c2||!c3)continue;
           rollNo=c2.replace(/\.0$/,"").trim();
           if(!rollNo)continue;
           var m2=c3.match(/^(.+?)\s+[SsDd]\/[Oo]\s+(.+)$/);
           if(m2){stuName=m2[1].trim();dadName=m2[2].trim();}else{stuName=c3.trim();}
-          // Look for phone in any remaining column on this row
-          for(var k=4;k<row.length;k++){
-            var v=String(row[k]||"").replace(/\.0$/,"").replace(/[\s\-\(\)]/g,"").trim();
-            if(/^\+?\d{10,15}$/.test(v)){phone=v;break;}
+          for(var k2=4;k2<row.length;k2++){
+            var v2=String(row[k2]||"").replace(/\.0$/,"").replace(/[\s\-\(\)]/g,"").trim();
+            if(/^\d{10}$/.test(v2)&&v2[0]!=="0")v2="0"+v2;
+            if(/^\+?\d{9,15}$/.test(v2)){phone=v2;break;}
           }
         }
         if(!stuName||!rollNo)continue;
-
-        var existingStu=users.find(function(u){return u.role==="student"&&u.rollNo===rollNo;});
-        if(existingStu){
-          if(dadName)existingStu.fatherName=dadName;
-          if(phone)existingStu.phone=phone;
-          updated++;continue;
-        }
         var cls=curCls+(curSec?" ("+curSec+")":"");
+        xlsStagingRows.push({rollNo:rollNo,name:stuName,fatherName:dadName,phone:phone,cls:cls});
+      }
+
+      // ── Detect if all students share ONE class (needs user to confirm/override) ──
+      var uniqueClasses=[...new Set(xlsStagingRows.map(function(s){return s.cls;}))];
+      var detectedCls=uniqueClasses.length===1?uniqueClasses[0]:(uniqueClasses.filter(Boolean)[0]||"");
+
+      // If only one class detected (or no class), show class picker step
+      if(uniqueClasses.length<=1){
+        xlsStagingUpdated=0;
+        // Build class select
+        var sel=document.getElementById("si-cls-sel");
+        sel.innerHTML="";
+        var allCls=getClasses();
+        // Add detected class first if valid
+        if(detectedCls&&allCls.indexOf(detectedCls)<0)allCls=[detectedCls].concat(allCls);
+        if(!detectedCls&&allCls.length===0)allCls=["Class 1"];
+        allCls.forEach(function(c){
+          var opt=document.createElement("option");
+          opt.value=c; opt.textContent=c;
+          if(c===detectedCls)opt.selected=true;
+          sel.appendChild(opt);
+        });
+        // Also add option to create a new class
+        var optNew=document.createElement("option");
+        optNew.value="__new__"; optNew.textContent="+ Enter new class name...";
+        sel.appendChild(optNew);
+
+        var count=xlsStagingRows.length;
+        document.getElementById("si-cls-msg").textContent=
+          count+" student"+(count===1?"":"s")+" found."+(detectedCls?" File says “"+detectedCls+"” — confirm or change class below.":"  No class detected — please select a class.");
+        document.getElementById("si-s1").style.display="none";
+        document.getElementById("si-s3").style.display="";
+      } else {
+        // Multiple classes — commit directly
+        xlsCommitImport(null);
+      }
+    }catch(err){showToast("Error: "+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Word (.docx) student import ──────────────────────────────────────
+function cancelXlsImport(){
+  xlsStagingRows=[];xlsStagingUpdated=0;
+  document.getElementById("si-s3").style.display="none";
+  document.getElementById("si-s1").style.display="";
+  document.getElementById("si-inp").value="";
+}
+function confirmXlsImport(){
+  var sel=document.getElementById("si-cls-sel");
+  var chosen=sel?sel.value:"";
+  if(chosen==="__new__"){
+    var newCls=prompt("Enter new class name (e.g. Class 5):");
+    if(!newCls||!newCls.trim()){showToast("Please enter a valid class name.");return;}
+    chosen=newCls.trim();
+  }
+  if(!chosen){showToast("Please select a class.");return;}
+  xlsCommitImport(chosen);
+}
+function xlsCommitImport(overrideCls){
+  var added=0,updated=0;
+  xlsStagingRows.forEach(function(s){
+    var cls=overrideCls||(s.cls)||classes[0]||"Class 1";
+    var existingStu=users.find(function(u){return u.role==="student"&&u.rollNo===s.rollNo;});
+    if(existingStu){
+      if(s.fatherName)existingStu.fatherName=s.fatherName;
+      if(s.phone)existingStu.phone=s.phone;
+      updated++;return;
+    }
+    ensureClass(cls);
+    users.push({id:uid(),name:s.name,role:"student",username:s.rollNo,
+      password:s.rollNo,cls:cls,rollNo:s.rollNo,fatherName:s.fatherName||"",phone:s.phone||""});
+    added++;
+  });
+  xlsStagingRows=[];
+  document.getElementById("si-s3").style.display="none";
+  document.getElementById("si-s2").style.display="";
+  document.getElementById("si-done-msg").textContent=added+" student"+(added===1?"":"s")+" imported!";
+  var parts=[];
+  if(updated>0)parts.push(updated+" existing updated");
+  parts.push("Students login with Roll No + Phone Number.");
+  document.getElementById("si-done-sub").textContent=parts.join(" — ");
+  buildQuickBtns();renderUsers();
+}
+function handleDocxStudentImport(file){
+  if(typeof mammoth==="undefined"){
+    showToast("Word reader not loaded yet. Check internet and try again.");return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    mammoth.extractRawText({arrayBuffer:ev.target.result}).then(function(result){
+      var lines=result.value.split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean);
+      var added=0,updated=0,curCls="";
+      for(var i=0;i<lines.length;i++){
+        var line=lines[i];
+        // Detect class heading lines like "Class 8" or "Class: 8 (A)"
+        var clsMatch=line.match(/^[Cc]lass\s*:?\s*(\S.*)/);
+        if(clsMatch){curCls="Class "+clsMatch[1].trim();continue;}
+        // Parse tab/comma/pipe separated: Roll, Name, Phone OR Name, Roll, Phone
+        var parts=line.split(/[\t,|]+/).map(function(p){return p.trim();});
+        if(parts.length<2)continue;
+        var rollNo="",stuName="",dadName="",phone="",cls=curCls;
+        // Detect which part is the roll number (numeric or alphanumeric short code)
+        var rollIdx=-1,nameIdx=-1,phoneIdx=-1,clsIdx=-1;
+        for(var j=0;j<parts.length;j++){
+          var p=parts[j];
+          if(/^\d{2,6}$/.test(p)&&rollIdx<0){rollIdx=j;}
+          else if(/^\+?\d{10,15}$/.test(p.replace(/[\s\-\(\)]/g,""))&&phoneIdx<0){phoneIdx=j;}
+          else if(/^[Cc]lass\s+\S/.test(p)&&clsIdx<0){clsIdx=j;}
+          else if(p.length>1&&nameIdx<0){nameIdx=j;}
+        }
+        if(rollIdx<0||nameIdx<0)continue;
+        rollNo=parts[rollIdx];
+        var rawName=parts[nameIdx];
+        var m=rawName.match(/^(.+?)\s+[SsDd]\/[Oo]\s+(.+)$/);
+        if(m){stuName=m[1].trim();dadName=m[2].trim();}else{stuName=rawName;}
+        if(phoneIdx>=0)phone=parts[phoneIdx].replace(/[\s\-\(\)]/g,"");
+        if(clsIdx>=0)cls="Class "+parts[clsIdx].replace(/^[Cc]lass\s+/,"").trim();
         if(!cls)cls=classes[0]||"Class 1";
+        if(!stuName||!rollNo)continue;
+        var existing=users.find(function(u){return u.role==="student"&&u.rollNo===rollNo;});
+        if(existing){if(dadName)existing.fatherName=dadName;if(phone)existing.phone=phone;updated++;continue;}
         users.push({id:uid(),name:stuName,role:"student",username:rollNo,
           password:rollNo,cls:cls,rollNo:rollNo,fatherName:dadName,phone:phone});
-        ensureClass(cls);
-        added++;
+        ensureClass(cls);added++;
       }
       document.getElementById("si-s1").style.display="none";
       document.getElementById("si-s2").style.display="";
       document.getElementById("si-done-msg").textContent=added+" student"+(added===1?"":"s")+" imported!";
-      var parts=[];
-      if(updated>0)parts.push(updated+" existing updated");
-      if(skipped>0)parts.push(skipped+" skipped");
-      parts.push("Students login with Roll No + Phone Number.");
-      document.getElementById("si-done-sub").textContent=parts.join(" — ");
+      var parts2=[];
+      if(updated>0)parts2.push(updated+" existing updated");
+      parts2.push("Students login with Roll No + Phone Number.");
+      document.getElementById("si-done-sub").textContent=parts2.join(" — ");
       buildQuickBtns();
-    }catch(err){showToast("Error: "+err.message);}
+    }).catch(function(err){showToast("Word read error: "+err.message);});
   };
   reader.readAsArrayBuffer(file);
 }
@@ -3339,6 +3524,7 @@ function parsePdfStudentFile(file){
           var phones=[];
           ["c1","c2","c3","c4"].forEach(function(c){
             var v=cols[c].replace(/[\s\-]/g,"").trim();
+            if(/^\d{10}$/.test(v)&&v[0]!=="0")v="0"+v;
             if(/^\+?\d{10,15}$/.test(v))phones.push(v);
           });
 
@@ -3634,13 +3820,13 @@ function sendUserToBin(id){
 }
 function openUserModal(id){
   editUserId=id;
-  var isT=true;if(id){var uF=users.find(function(x){return x.id===id;});if(uF)isT=(uF.role!=="student");}else{isT=(userTab==="teachers");}
+  var isT=true;if(id){var uF=users.find(function(x){return String(x.id)===String(id);});if(uF)isT=(uF.role!=="student");}else{isT=(userTab==="teachers");}
   document.getElementById("user-modal-title").textContent=id?("Edit "+(isT?"Teacher":"Student")):("Add New "+(isT?"Teacher":"Student"));
   document.getElementById("u-roll-wrap").style.display=isT?"none":"block";
   var _fw=document.getElementById("u-father-wrap");if(_fw)_fw.style.display=isT?"none":"block";
   var _pw=document.getElementById("u-phone-wrap");if(_pw)_pw.style.display=isT?"none":"block";
   buildClassDrops();
-  if(id){var u=users.find(function(x){return x.id===id;});if(!u)return;document.getElementById("u-name").value=u.name;document.getElementById("u-uname").value=u.username;document.getElementById("u-pass").value=u.password;document.getElementById("u-roll").value=u.rollNo||"";
+  if(id){var u=users.find(function(x){return String(x.id)===String(id);});if(!u)return;document.getElementById("u-name").value=u.name;document.getElementById("u-uname").value=u.username;document.getElementById("u-pass").value=u.password;document.getElementById("u-roll").value=u.rollNo||"";
     var _uf=document.getElementById("u-father");if(_uf)_uf.value=u.fatherName||"";
     var _up=document.getElementById("u-phone");if(_up)_up.value=u.phone||"";
     dropVal["u-cls"]=u.cls||classes[0];buildDrop("u-cls",classes,null);var btn=document.getElementById("btn-u-cls");if(btn)btn.textContent=(u.cls||classes[0])+" \u25BC";}
@@ -3656,10 +3842,10 @@ function saveUser(){
   if(!name){showToast("Please enter the full name.");return;}if(!uname){showToast("Please enter a username.");return;}
   if(role==="student"){
     if(!roll){showToast("Roll number is required.");return;}
-    var dup=users.find(function(u){return u.role==="student"&&u.rollNo===roll&&u.id!==editUserId;});
+    var dup=users.find(function(u){return u.role==="student"&&u.rollNo===roll&&String(u.id)!==String(editUserId);});
     if(dup){showToast("Roll No. "+roll+" already assigned to "+dup.name+".");return;}
   }
-  var dupU=users.find(function(u){return u.username===uname&&u.id!==editUserId;});
+  var dupU=users.find(function(u){return u.username===uname&&String(u.id)!==String(editUserId);});
   if(dupU){showToast("Username '"+uname+"' already taken.");return;}
   var _fEl=document.getElementById("u-father");
   var _fName=_fEl?_fEl.value.trim():"";
@@ -3667,7 +3853,7 @@ function saveUser(){
   var _phone=_pEl?_pEl.value.trim():"";
   var obj={name:name,username:uname,password:pass||"1234",role:role,cls:cls};
   if(role==="student"){obj.rollNo=roll;obj.fatherName=_fName;obj.phone=_phone;}
-  if(editUserId){for(var i=0;i<users.length;i++){if(users[i].id===editUserId){users[i]=Object.assign({},users[i],obj);break;}}showToast(name+" updated.");}
+  if(editUserId){for(var i=0;i<users.length;i++){if(String(users[i].id)===String(editUserId)){users[i]=Object.assign({},users[i],obj);break;}}showToast(name+" updated.");}
   else{users.push(Object.assign({id:uid()},obj));showToast(name+" added.");}
   closeModal("modal-user");buildQuickBtns();renderUsers();
 }
